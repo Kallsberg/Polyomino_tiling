@@ -14,7 +14,7 @@ polyominos = [ array( [ [1] , [1] , [1] , [1] ] ) ,
                array( [ [0,1] , [1,1] , [1,0] ] ) ]
 
 # Solving the layout problem
-A_sol, obj = Solve( R , polyominos , zeros=[112] )
+A_sol, obj = Solve( R , polyominos ,zeros=[] )
 
 # Plotting the solution
 PlotSol( A_sol, polyominos, obj )

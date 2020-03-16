@@ -287,7 +287,7 @@ def Solve( R, polyominos , zeros = []):
     rhs                      = matrix( 1.0, ( num_eq, 1 ) ) 
     obj                      = ones( ( var_tot ) ) 
     
-    rhs[zeros]               = 0
+    
     x = m.addMVar(shape = var_tot, vtype = GRB.BINARY, name = "x")
     # Adding weight corriponding to the number of squared in the polyomino
     tmp = 0
@@ -309,8 +309,9 @@ def Solve( R, polyominos , zeros = []):
     m.setObjective(obj @ x, GRB.MAXIMIZE)
 
     # Build rhs 
-    rhs = ones(M*N)
-
+    rhs        = ones(M*N)
+    rhs[zeros] = 0
+    
     # Add constraints
     m.addConstr(ineq_cons @ x <= rhs, name="c")
 

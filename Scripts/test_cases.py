@@ -8,7 +8,7 @@ M, N = 16,16
 R   = ones( (M,N) )
 
 # Test case
-case = 4
+case = 1
 
 # Free Polyominoes, 4 test cases
 if case == 0:
