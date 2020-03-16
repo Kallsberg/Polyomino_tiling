@@ -205,7 +205,7 @@ def Solution( x , R , polyominos ):
     # Construciton of solution
     M,N = R.shape
     A_sol = zeros( (M,N) )
-
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
     var = 0 # initialize counter
 
     # Main Construciton of solution
@@ -223,7 +223,7 @@ def Solution( x , R , polyominos ):
                 var += 1  # update conter
     return A_sol
 
-def PlotSol(sol_matrix,polyominos,obj_val):
+def PlotSol( sol_matrix , polyominos , obj_val , Psize = (8,8) ):
     # The purpose of this function is to plot the solution for the minimization
     # problem
     #
@@ -234,10 +234,14 @@ def PlotSol(sol_matrix,polyominos,obj_val):
 
     import matplotlib.pyplot as plt
     import numpy             as np
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
 
     # Get matrix size
     M,N = sol_matrix.shape
 
+    plt.figure(figsize = Psize)
+    plt.title('Size of rectangle is %d$\\times$%d \n%d of %d squares are filled' % ( M, N, obj_val, M*N ) )
+    ax = plt.gca()
     # Get discrete colormap
     cmap         = plt.get_cmap( 'jet', len( polyominos )  )
     value        = 0
@@ -245,36 +249,46 @@ def PlotSol(sol_matrix,polyominos,obj_val):
 
     cmap.set_bad( color = 'w' )
     # Plot and set limits .5 outside true range
-    mat = plt.imshow( masked_array, cmap = cmap, vmin = 1 - .5, vmax = len( polyominos ) + .5)
+    mat = ax.imshow( masked_array, cmap = cmap, vmin = 1 - .5, vmax = len( polyominos ) + .5)
 
     # Tell the colorbar to tick at integers
-    cax = plt.colorbar( mat, ticks = np.arange( 0, len( polyominos ) + 1 ) )
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    cax = plt.colorbar( mat, ticks = np.arange( 0, len( polyominos ) + 1 ),cax = cax )
 
-    # Setting tickmarks and grid
-    ax = plt.gca()
+    
 
     ax.set_xticks( np.arange( -.5, N, 1 ) )
     ax.set_yticks( np.arange( -.5, M, 1 ) )
     ax.grid( which = 'major', color = 'k', linestyle = '-', linewidth = 2 )
     ax.tick_params( colors = 'w' )                                            # removes tick numbering
-
+    
     # Title and show plot
-    plt.title('Size of rectangle is %d$\\times$%d \n%d of %d squares are filled' % ( M, N, obj_val, M*N ) )
-    plt.show()   
+    
+    plt.show(ax)   
 
 def Solve( R, polyominos , zeros = []):
-    from cvxopt        import matrix, solvers
-    from cvxopt.glpk   import ilp
+    from cvxopt      import matrix, solvers
+    import gurobipy as gp
+    from gurobipy import GRB
+    from numpy       import ones
+    
+    m = gp.Model("Polyomino")
+
+    # Create variables
+    M,N = R.shape
+    
 
     
     # Constraints, RHS, and cost vector
     ineq_cons,var_tot, var_k = Constraints( R, polyominos ) 
     num_eq                   = ineq_cons.shape[0]
-    ineq_cons                = matrix( ineq_cons, ( num_eq,var_tot ), 'd' )
+    # ineq_cons                = matrix( ineq_cons, ( num_eq,var_tot ), 'd' )
     rhs                      = matrix( 1.0, ( num_eq, 1 ) ) 
-    w                        = matrix( 1.0, ( var_tot, 1 ) ) 
+    obj                      = ones( ( var_tot ) ) 
     
     rhs[zeros]               = 0
+    x = m.addMVar(shape = var_tot, vtype = GRB.BINARY, name = "x")
     # Adding weight corriponding to the number of squared in the polyomino
     tmp = 0
     i   = 0
@@ -282,17 +296,30 @@ def Solve( R, polyominos , zeros = []):
         squares = int( sum( sum( polyominos[k] ) ) ) 
     
         for i in range( int( var_k[k] ) ): 
-            w[i + tmp] = squares
+            obj[i + tmp] = squares
         tmp += i + 1 
     
     
     # Solving the binary problem
-    # Using CVXOPT to solve the problem
-    status, x = ilp( -w, ineq_cons, rhs, B = set( range( var_tot ) ) ) 
+    # Using Gurobi to solve the MIP
+    # Set objective
+    print(x.shape)
+    print()
+    print(obj.shape)
+    m.setObjective(obj @ x, GRB.MAXIMIZE)
 
-    obj =  w.T*x
+    # Build rhs 
+    rhs = ones(M*N)
+
+    # Add constraints
+    m.addConstr(ineq_cons @ x <= rhs, name="c")
+
+    # Optimize model
+    m.optimize() 
+
+    
 
     # Generate a solution matrix
-    A_sol = Solution( x, R, polyominos )
+    A_sol = Solution( x.X, R, polyominos )
 
-    return A_sol , obj[0]
+    return A_sol , m.objVal

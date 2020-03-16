@@ -1,44 +1,69 @@
-import matplotlib.pyplot as plt
+# Copyright 2020, Gurobi Optimization, LLC
 
-from Polyomino import Variants,ExchangeMatrix
-from numpy     import array, zeros
-from cvxopt    import matrix
+# This example formulates and solves the following simple MIP model
+# using the matrix API:
+#  maximize
+#        x +   y + 2 z
+#  subject to
+#        x + 2 y + 3 z <= 4
+#        x +   y       >= 1
+#        x, y, z binary
 
-# polys = []
+import numpy as np
+import scipy.sparse as sp
+import gurobipy as gp
+from gurobipy import GRB
+from Polyomino import Constraints,Variants
 
-# p = [array([[1],[1],[1],[1]]),
-#      array([[1,0],[1,0],[1,1]])]
+try:
+    R = np.ones((16,16))
 
+    p = [ np.array( [ [1,0,0] ,
+                   [1,0,0] ,
+                   [1,1,1] ,
+                   [1,1,1] ] ) ] # L-octomino
+    
+    # Construct orientations and compute number of fixed polyominoes    
+    polyominos, NUM = Variants( p )
 
+    # Create a new model
+    m = gp.Model("matrix1")
 
-# p = [array([[1,1],[1,0],[1,0]])]                     # L-trimino
-# polyominos,number = Variants(p, reflect= False)
-# for i in range(len(polyominos)):
-#     print(polyominos[i])
+    
 
+    # Build (sparse) constraint matrix
+    # data = np.array([1.0, 2.0, 3.0, -1.0, -1.0])
+    # row = np.array([0, 0, 0, 1, 1])
+    # col = np.array([0, 1, 2, 0, 1])
 
-# m_p,n_p = polyominos[0].shape
+    # A = sp.csr_matrix((data, (row, col)), shape=(2, 3))
+    A, var, var_k = Constraints(R, polyominos)
 
-# polys = zeros((m_p+4,int((m_p+n_p)*number/2) + 20))
-# k = 0
-# # for k in range(polyominos):
+    # Create variables
+    x = m.addMVar(shape = var, vtype = GRB.BINARY, name = "x")
 
+    # Set objective
+    obj = np.ones(var)
+    
+    print(var)
+    
+    print(obj.T @ x)    
+    m.setObjective(obj @ x, GRB.MAXIMIZE)
 
-# # polys[(0+2):(m_p+2),(0+2):(n_p+2)] += polyominos[k]*(k+1)
-# # k = 1
-# # m_p,n_p = polyominos[k].shape
+    # Build rhs vector
+    rhs = np.ones(16*16)
 
-# # polys[(0+2):(m_p+2),(0+2+n_p+2):(n_p+2+n_p+2)] += polyominos[k]*(k+1)
-# n_old = 2
-# for k in range(number):
-#     m_p,n_p = polyominos[k].shape    
-#     polys[2:(m_p+2),(n_old):(n_old+n_p)] += polyominos[k]*(k+1)
-#     n_old = (4 + n_old)
-# plt.imshow(polys,cmap = 'gist_rainbow')
-# plt.show()    
+    # Add constraints
+    m.addConstr(A @ x <= rhs, name="c")
 
-J = ExchangeMatrix(5)
-x = matrix(1.0,(5,1))
+    # Optimize model
+    m.optimize()
 
-print(J*x)
-# ## Bobyqa
+    print(x.X)
+    print('Obj: %g' % m.objVal)
+
+except gp.GurobiError as e:
+    print('Error code ' + str(e.errno) + ": " + str(e))
+
+except AttributeError:
+    print('Encountered an attribute error')
