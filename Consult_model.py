@@ -18,3 +18,5 @@ A_sol, obj = Solve( R , polyominos , zeros=[112] )
 
 # Plotting the solution
 PlotSol( A_sol, polyominos, obj )
+
+# einar
