@@ -267,14 +267,30 @@ def PlotSol( sol_matrix , polyominos , obj_val , Psize = (8,8) ):
     
     plt.show(ax)   
 
-def Solve( R, polyominos , zeros = []):
+def Solve( R, polyominos , zeros = [], Output = True):
+    # The purpose of this function is to solve the MIP
+    #
+    #
+    #
+    # INPUTS:
+    #     R          : rectangle to tile
+    #     polyominos : list of polyominoes
+    #     zero       : True/False (optional)
+    #     Output     : True/False (optional)
+    # OUTPUT:
+    #     A_sol    : tiling solution
+    #     m.objVal : objective value for solution
+
+
+
+
     from cvxopt      import matrix, solvers
     import gurobipy as gp
     from gurobipy import GRB
     from numpy       import ones
     
     m = gp.Model("Polyomino")
-
+    m.setParam( 'OutputFlag', Output )
     # Create variables
     M,N = R.shape
     
@@ -302,10 +318,8 @@ def Solve( R, polyominos , zeros = []):
     
     # Solving the binary problem
     # Using Gurobi to solve the MIP
+    
     # Set objective
-    print(x.shape)
-    print()
-    print(obj.shape)
     m.setObjective(obj @ x, GRB.MAXIMIZE)
 
     # Build rhs 
