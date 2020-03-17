@@ -1,7 +1,6 @@
 from numpy import array, flip, transpose, rot90, shape, append, zeros,max, where
 from cvxopt import matrix, spmatrix, solvers, normal
-from cvxopt.lapack import gesv
-from cvxopt.glpk import ilp
+
 
 def ExchangeMatrix(order):
     from cvxopt import matrix
