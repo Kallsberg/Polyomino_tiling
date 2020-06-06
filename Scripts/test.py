@@ -9,61 +9,79 @@
 #        x +   y       >= 1
 #        x, y, z binary
 
-import numpy as np
-import scipy.sparse as sp
-import gurobipy as gp
-from gurobipy import GRB
-from Polyomino import Constraints,Variants
+from Polyomino import Variants,Constraints, Solution, PlotSol, Solve
+from numpy     import ones, array, zeros, mean, savetxt,linspace
 
-try:
-    R = np.ones((16,16))
+import time              as time
+import matplotlib.pyplot as plt
+# Size of grid to tile
+Mmin  = 14
+Mmax  = 14
+M_    =  linspace(Mmin,Mmax,Mmax-Mmin+1)
+k     = len(M_)
+Tests = 1
+T     = zeros((k,Tests))
+FN    = zeros((k,Tests))
 
-    p = [ np.array( [ [1,0,0] ,
-                   [1,0,0] ,
-                   [1,1,1] ,
-                   [1,1,1] ] ) ] # L-octomino
+for i in range(k):
+    for j in range(Tests):
+        print('-------------------')
+        print('M = N =',M_[i])
+        K_    = 0
+        t = time.time()
+        N = int(M_[i])
+        M = N
+        # Generating the rectangle
+        R   = ones( (M,N) )
+
+        # Free Polyominoes, 4 test cases
+        p = [ array( [ [1,0,0] ,
+                       [1,1,1] ] )]#,
+            #   array( [ [0,1,0] ,
+            #            [1,1,1]]) ]
+            
+        # Construct orientations and compute number of fixed polyominoes    
+        polyominos, NUM = Variants( p )
+        
+        # Solve the problem
+        
+        A_sol, obj, status = Solve( R , polyominos , Output = True , UpperBound = False , MaxIter = None)
+        
+        if status != 2:
+            while status != 2:
+                K_ += 1
+                print('K: {:6}'.format(K_))
     
-    # Construct orientations and compute number of fixed polyominoes    
-    polyominos, NUM = Variants( p )
+                A_sol, obj, status = Solve( R, polyominos, Output = True, K = K_ ,UpperBound = True , MaxIter=1e3)
+        
+        print('Status: {:}'.format(status))
+        print('Obj: {:7}'.format(obj))
+        T[i,j]  = time.time() - t
+        FN[i,j] = obj
 
-    # Create a new model
-    m = gp.Model("matrix1")
+FN_avg = zeros((k,1))
+T_avg  = zeros((k,1))        
 
-    
+for i in range(k):
+    FN_avg[i] = M_[i]**2 - mean(FN[i,:])
+    T_avg[i] = mean(T[i,:])
 
-    # Build (sparse) constraint matrix
-    # data = np.array([1.0, 2.0, 3.0, -1.0, -1.0])
-    # row = np.array([0, 0, 0, 1, 1])
-    # col = np.array([0, 1, 2, 0, 1])
+# Plotting results
+plt.semilogy(M_,T_avg,'-o')
+plt.grid(which = 'both')
+plt.xlabel('M = N')
+plt.ylabel('Average time [sec]')
+plt.show()
 
-    # A = sp.csr_matrix((data, (row, col)), shape=(2, 3))
-    A, var, var_k = Constraints(R, polyominos)
+plt.plot(M_,FN_avg,'-o')
+plt.grid(which = 'both')
+plt.xlabel('M=N')
+plt.ylabel('Number of holes')
+plt.show()
 
-    # Create variables
-    x = m.addMVar(shape = var, vtype = GRB.BINARY, name = "x")
 
-    # Set objective
-    obj = np.ones(var)
-    
-    print(var)
-    
-    print(obj.T @ x)    
-    m.setObjective(obj @ x, GRB.MAXIMIZE)
-
-    # Build rhs vector
-    rhs = np.ones(16*16)
-
-    # Add constraints
-    m.addConstr(A @ x <= rhs, name="c")
-
-    # Optimize model
-    m.optimize()
-
-    print(x.X)
-    print('Obj: %g' % m.objVal)
-
-except gp.GurobiError as e:
-    print('Error code ' + str(e.errno) + ": " + str(e))
-
-except AttributeError:
-    print('Encountered an attribute error')
+# # Save data
+# savetxt('FN_feasi.txt',FN, delimiter = ',') 
+# savetxt('FN_avg_feasi.txt',FN_avg, delimiter = ',') 
+# savetxt('Time_feasi.txt',T, delimiter = ',') 
+# savetxt('Time_avg_feasi.txt',T_avg, delimiter = ',')     

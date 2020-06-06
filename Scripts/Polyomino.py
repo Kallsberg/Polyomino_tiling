@@ -118,21 +118,23 @@ def Index( R ):
     return num_eq, R_index
 
 def Constraints( R , polyominos ):
-    # The purpose for this funtion is to generate the constraint matrix
-    # for the problem
-    #   max c*x
-    #   s.t. 
-    #   A*x <= 1
-    #   for x binary
-    #
-    # INPUT:
-    #     R          : Rectangle to tile
-    #     polyominoes: list of polyominoes
-    #
-    # OUTPUT:
-    #     A    : Constraint matrix
-    #     var  : Total number of variables
-    #     var_k: Number of variables assigned to each polyomino
+    '''
+    The purpose for this funtion is to generate the constraint matrix
+    for the problem
+        max c*x
+        s.t. 
+        A*x <= y
+        for x,y binary
+    
+    INPUT:
+        R          : Rectangle to tile
+        polyominoes: list of polyominoes
+    
+    OUTPUT:
+        A    : Constraint matrix
+        var  : Total number of variables
+        var_k: Number of variables assigned to each polyomino
+    '''
 
     M, N            = R.shape
     num_eq, R_index = Index( R ) 
@@ -189,17 +191,19 @@ def Constraints( R , polyominos ):
     return A, var, var_k
 
 def Solution( x , R , polyominos ):
-    # The purpose of this function is to compute the solution to the problem
-    #   max c*x
-    #   s.t.
-    #   A*x <= 1
-    #   for x binary
-    # INPUTS:
-    #     x          : Solution
-    #     R          : Rectangle
-    #     polyominos : set of polyominoes
-    # OUTPUT:
-    #     A_sol : Matrix with polyomino number, for plotting
+    '''
+    The purpose of this function is to compute the solution to the problem
+        max c*x
+        s.t.
+        A*x <= y
+        for x,y binary
+    INPUTS:
+        x          : Solution
+        R          : Rectangle
+        polyominos : set of polyominoes
+    OUTPUT:
+        A_sol : Matrix with polyomino number, for plotting
+    '''
 
     # Construciton of solution
     M,N = R.shape
@@ -222,14 +226,19 @@ def Solution( x , R , polyominos ):
                 var += 1  # update conter
     return A_sol
 
-def PlotSol( sol_matrix , polyominos , obj_val , Psize = (8,8) ):
-    # The purpose of this function is to plot the solution for the minimization
-    # problem
-    #
-    # INPUT:
-    #     sol_matrix: Solution matrix
-    #     polyominos: Fixed polyominos
-    #     obj_val   : objective value for optimal solution
+def PlotSol( sol_matrix , polyominos , obj_val , Psize = (8,8) , Title = True, Colorbar = True):
+    '''
+    The purpose of this function is to plot the solution for the minimization
+    problem
+    
+    INPUT:
+        sol_matrix: Solution matrix
+        polyominos: Fixed polyominos
+        obj_val   : objective value for optimal solution
+    
+    OUTPUT:
+        Plot of solution
+    '''
 
     import matplotlib.pyplot as plt
     import numpy             as np
@@ -239,8 +248,10 @@ def PlotSol( sol_matrix , polyominos , obj_val , Psize = (8,8) ):
     M,N = sol_matrix.shape
 
     plt.figure(figsize = Psize)
-    plt.title('Size of rectangle is %d$\\times$%d \n%d of %d squares are filled' % ( M, N, obj_val, M*N ) )
+    if Title == True:
+        plt.title('Size of rectangle is %d$\\times$%d \n%d of %d squares are filled' % ( M, N, obj_val, M*N ) )
     ax = plt.gca()
+    
     # Get discrete colormap
     cmap         = plt.get_cmap( 'jet', len( polyominos )  )
     value        = 0
@@ -251,9 +262,10 @@ def PlotSol( sol_matrix , polyominos , obj_val , Psize = (8,8) ):
     mat = ax.imshow( masked_array, cmap = cmap, vmin = 1 - .5, vmax = len( polyominos ) + .5)
 
     # Tell the colorbar to tick at integers
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    cax = plt.colorbar( mat, ticks = np.arange( 0, len( polyominos ) + 1 ),cax = cax )
+    if Colorbar == True:
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        cax = plt.colorbar( mat, ticks = np.arange( 0, len( polyominos ) + 1 ),cax = cax )
 
     
 
@@ -266,30 +278,55 @@ def PlotSol( sol_matrix , polyominos , obj_val , Psize = (8,8) ):
     
     plt.show(ax)   
 
-def Solve( R, polyominos , zeros = [], Output = True):
-    # The purpose of this function is to solve the MIP
-    #
-    #
-    #
-    # INPUTS:
-    #     R          : rectangle to tile
-    #     polyominos : list of polyominoes
-    #     zero       : True/False (optional)
-    #     Output     : True/False (optional)
-    # OUTPUT:
-    #     A_sol    : tiling solution
-    #     m.objVal : objective value for solution
-
-
-
-
-    from cvxopt      import matrix, solvers
-    import gurobipy as gp
+def KnapSack(poly_area,M,N):
     from gurobipy import GRB
-    from numpy       import ones
+    import gurobipy as gp
     
+    # number of variables for problem
+    n_var = len(poly_area)
+    
+    # Defining model
+    m = gp.Model('KnapSack')
+    m.setParam( 'OutputFlag', False )
+    # Defining variables
+    x = m.addMVar(shape = n_var,vtype = GRB.INTEGER,name = 'x')
+    
+    # Setting objective and constraint
+    m.setObjective(poly_area @ x, GRB.MAXIMIZE)
+    
+    m.addConstr(poly_area @ x <= M*N , name = "c")
+
+    # Solving the problem
+    m.optimize() 
+    
+    if GRB.OPTIMAL == m.status:
+        return m.objVal
+    
+def Solve( R, polyominos , Zeros = [] , Ones = [] , Output = True, MaxIter = None, K = None, UpperBound = None):
+    '''
+    This function is made to solve the tiling problem given a set of fixed polyominoes.
+
+    INPUTS:
+        R           : Rectangle to tile
+        polyominoes : array of fixed polyominoes
+        Zeros       : array of cell numbers for equality constraints with 0 on the RHS(optional)
+        Ones        : array of cell numbers for equality constraints with 1 on the RHS(optional)
+        Output      : boolean variable(default True), set to false if outputflag is not wanted
+        MaxIter     : integer, if the user wants a number of max iterations. The number given is then 
+                      multiplied with the  number of variables in the model
+        K           : integer, K is used if the user knows there are going to be a specific number of holes
+        UpperBound  : integer or boolean, default None. If True a knapsack problem is solved to find upper
+                      bound, if integer the given number is the upper bound.
+    '''
+
+    from cvxopt   import matrix, solvers
+    from gurobipy import GRB
+    from numpy    import ones,zeros,unique
+    import gurobipy as gp
+
     m = gp.Model("Polyomino")
     m.setParam( 'OutputFlag', Output )
+
     # Create variables
     M,N = R.shape
     
@@ -299,11 +336,13 @@ def Solve( R, polyominos , zeros = [], Output = True):
     ineq_cons,var_tot, var_k = Constraints( R, polyominos ) 
     num_eq                   = ineq_cons.shape[0]
     # ineq_cons                = matrix( ineq_cons, ( num_eq,var_tot ), 'd' )
-    rhs                      = matrix( 1.0, ( num_eq, 1 ) ) 
     obj                      = ones( ( var_tot ) ) 
     
     
     x = m.addMVar(shape = var_tot, vtype = GRB.BINARY, name = "x")
+    y = m.addMVar(shape = M*N, vtype = GRB.BINARY, name = "y")
+    
+    
     # Adding weight corriponding to the number of squared in the polyomino
     tmp = 0
     i   = 0
@@ -319,21 +358,52 @@ def Solve( R, polyominos , zeros = [], Output = True):
     # Using Gurobi to solve the MIP
     
     # Set objective
-    m.setObjective(obj @ x, GRB.MAXIMIZE)
+    m.setObjective(ones(M*N) @ y, GRB.MAXIMIZE)
 
-    # Build rhs 
-    rhs        = ones(M*N)
-    rhs[zeros] = 0
+    if MaxIter != None:
+        # The number of max interations is based on the number of varaibles
+        m.setParam('IterationLimit',var_tot*MaxIter)
     
+    if type(UpperBound) == bool:
+        if UpperBound == True:
+            P_sum = zeros(len(polyominos))
+            for i in range(len(polyominos)):
+                P_sum[i] = sum(sum(polyominos[i]))
+
+            # Upperbound is found by solving a Knapsack problem
+            UpperBound = KnapSack(unique(P_sum),M,N) - len(Zeros)
+            
+            if K == None:
+                K = 0
+
+            m.addConstr(sum(y) <= UpperBound - K)
+            
+    else:
+        
+        UpperBound = (M*N - len( Zeros ))//sum(sum(polyominos[0]))*sum(sum(polyominos[0]))
+        m.addConstr(sum(y) == UpperBound - K)
+        
     # Add constraints
-    m.addConstr(ineq_cons @ x <= rhs, name="c")
+    m.addConstr(ineq_cons @ x == y, name = "c")
+    if len(Zeros) != 0:
+        for i in range(len(Zeros)):
+            m.addConstr(ineq_cons[Zeros[i],:] @ x == 0)
+    if len(Ones) != 0:
+        for i in range(len(Ones)):
+            m.addConstr(ineq_cons[Ones[i],:] @ x == 1)
+    # if K != None:
+    #     m.addConstr(ones(M*N) @ y  == UpperBound - K, name = "feas")
 
     # Optimize model
     m.optimize() 
 
+    if GRB.OPTIMAL == m.status:
+        
+        # Generate a solution matrix
+        A_sol = Solution( x.X, R, polyominos )
+        
+        return A_sol , m.objVal, m.status
+    else:
+        return zeros((M,N)), 0, m.status
     
-
-    # Generate a solution matrix
-    A_sol = Solution( x.X, R, polyominos )
-
-    return A_sol , m.objVal
+    
